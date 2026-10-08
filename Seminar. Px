@@ -1,0 +1,422 @@
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import ttk
+import mysql.connector
+
+
+# Database connection
+def connect_database():
+    return mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="root123",
+        database="seminar_db"
+    )
+
+
+# Login
+def login():
+    username = username_entry.get()
+    password = password_entry.get()
+
+    if username == "admin" and password == "1234":
+        login_window.destroy()
+        dashboard()
+    else:
+        messagebox.showerror("Error", "Invalid username or password")
+
+
+# Add Seminar
+def add_seminar():
+    name = seminar_name_entry.get()
+    speaker = speaker_entry.get()
+    date = date_entry.get()
+    time = time_entry.get()
+    venue = venue_entry.get()
+    seats = seats_entry.get()
+
+    if name == "" or speaker == "" or date == "" or time == "" or venue == "" or seats == "":
+        messagebox.showwarning("Warning", "Please fill all fields")
+        return
+
+    db = connect_database()
+    cursor = db.cursor()
+
+    query = """ INSERT INTO seminars (seminar_name, speaker, seminar_date, seminar_time, venue, seats) VALUES (%s, %s, %s, %s, %s, %s) """
+
+    cursor.execute(query, (name, speaker, date, time, venue, seats))
+    db.commit()
+
+    cursor.close()
+    db.close()
+
+    messagebox.showinfo("Success", "Seminar added successfully!")
+    clear_seminar_fields()
+
+
+# Clear seminar fields
+def clear_seminar_fields():
+    seminar_name_entry.delete(0, tk.END)
+    speaker_entry.delete(0, tk.END)
+    date_entry.delete(0, tk.END)
+    time_entry.delete(0, tk.END)
+    venue_entry.delete(0, tk.END)
+    seats_entry.delete(0, tk.END)
+
+
+# View seminars
+def view_seminars():
+    db = connect_database()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM seminars")
+    records = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    window = tk.Toplevel()
+    window.title("All Seminars")
+    window.geometry("900x400")
+
+    columns = (
+        "ID",
+        "Seminar Name",
+        "Speaker",
+        "Date",
+        "Time",
+        "Venue",
+        "Seats"
+    )
+
+    table = ttk.Treeview(window, columns=columns, show="headings")
+
+    for column in columns:
+        table.heading(column, text=column)
+        table.column(column, width=120)
+
+    for record in records:
+        table.insert("", tk.END, values=record)
+
+    table.pack(fill="both", expand=True)
+
+
+# Student registration
+def register_student():
+    student_id = student_id_entry.get()
+    student_name = student_name_entry.get()
+    department = department_entry.get()
+    email = email_entry.get()
+    phone = phone_entry.get()
+    seminar_id = seminar_id_entry.get()
+
+    if (student_id == "" or student_name == "" or department == "" or
+            email == "" or phone == "" or seminar_id == ""):
+        messagebox.showwarning("Warning", "Please fill all fields")
+        return
+
+    db = connect_database()
+    cursor = db.cursor()
+
+    # Check seminar
+    cursor.execute(
+        "SELECT seats FROM seminars WHERE seminar_id = %s",
+        (seminar_id,)
+    )
+
+    seminar = cursor.fetchone()
+
+    if seminar is None:
+        messagebox.showerror("Error", "Seminar not found")
+        cursor.close()
+        db.close()
+        return
+
+    if seminar[0] <= 0:
+        messagebox.showerror("Error", "No seats available")
+        cursor.close()
+        db.close()
+        return
+
+    query = """ INSERT INTO registrations (student_id, student_name, department, email, phone, seminar_id) VALUES (%s, %s, %s, %s, %s, %s) """
+
+    cursor.execute(
+        query,
+        (student_id, student_name, department, email, phone, seminar_id)
+    )
+
+    # Reduce available seats
+    cursor.execute(
+        "UPDATE seminars SET seats = seats - 1 WHERE seminar_id = %s",
+        (seminar_id,)
+    )
+
+    db.commit()
+
+    cursor.close()
+    db.close()
+
+    messagebox.showinfo("Success", "Student registered successfully!")
+    clear_registration_fields()
+
+
+# Clear registration fields
+def clear_registration_fields():
+    student_id_entry.delete(0, tk.END)
+    student_name_entry.delete(0, tk.END)
+    department_entry.delete(0, tk.END)
+    email_entry.delete(0, tk.END)
+    phone_entry.delete(0, tk.END)
+    seminar_id_entry.delete(0, tk.END)
+
+
+# View registrations
+def view_registrations():
+    db = connect_database()
+    cursor = db.cursor()
+
+    query = """ SELECT registration_id, student_id, student_name, department, email, phone, seminar_id FROM registrations """
+
+    cursor.execute(query)
+    records = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    window = tk.Toplevel()
+    window.title("All Registrations")
+    window.geometry("1000x400")
+
+    columns = (
+        "Registration ID",
+        "Student ID",
+        "Student Name",
+        "Department",
+        "Email",
+        "Phone",
+        "Seminar ID"
+    )
+
+    table = ttk.Treeview(window, columns=columns, show="headings")
+
+    for column in columns:
+        table.heading(column, text=column)
+        table.column(column, width=130)
+
+    for record in records:
+        table.insert("", tk.END, values=record)
+
+    table.pack(fill="both", expand=True)
+
+
+# Search registration
+def search_registration():
+    student_id = search_entry.get()
+
+    if student_id == "":
+        messagebox.showwarning("Warning", "Enter Student ID")
+        return
+
+    db = connect_database()
+    cursor = db.cursor()
+
+    query = """ SELECT * FROM registrations WHERE student_id = %s """
+
+    cursor.execute(query, (student_id,))
+    record = cursor.fetchone()
+
+    cursor.close()
+    db.close()
+
+    if record:
+        messagebox.showinfo(
+            "Registration Found",
+            "Registration ID: " + str(record[0]) +
+            "\nStudent ID: " + str(record[1]) +
+            "\nStudent Name: " + str(record[2]) +
+            "\nDepartment: " + str(record[3]) +
+            "\nEmail: " + str(record[4]) +
+            "\nPhone: " + str(record[5]) +
+            "\nSeminar ID: " + str(record[6])
+        )
+    else:
+        messagebox.showerror("Error", "Registration not found")
+
+
+# Dashboard
+def dashboard():
+
+    global seminar_name_entry
+    global speaker_entry
+    global date_entry
+    global time_entry
+    global venue_entry
+    global seats_entry
+
+    global student_id_entry
+    global student_name_entry
+    global department_entry
+    global email_entry
+    global phone_entry
+    global seminar_id_entry
+
+    global search_entry
+
+    dashboard_window = tk.Tk()
+    dashboard_window.title("Seminar Registration Management System")
+    dashboard_window.geometry("900x700")
+
+    title = tk.Label(
+        dashboard_window,
+        text="Seminar Registration Management System",
+        font=("Arial", 20, "bold")
+    )
+    title.pack(pady=15)
+
+    # Seminar section
+    seminar_frame = tk.LabelFrame(
+        dashboard_window,
+        text="Add Seminar",
+        padx=10,
+        pady=10
+    )
+    seminar_frame.pack(fill="x", padx=20, pady=10)
+
+    tk.Label(seminar_frame, text="Seminar Name").grid(row=0, column=0)
+    seminar_name_entry = tk.Entry(seminar_frame, width=25)
+    seminar_name_entry.grid(row=0, column=1)
+
+    tk.Label(seminar_frame, text="Speaker").grid(row=0, column=2)
+    speaker_entry = tk.Entry(seminar_frame, width=25)
+    speaker_entry.grid(row=0, column=3)
+
+    tk.Label(seminar_frame, text="Date").grid(row=1, column=0)
+    date_entry = tk.Entry(seminar_frame, width=25)
+    date_entry.grid(row=1, column=1)
+
+    tk.Label(seminar_frame, text="Time").grid(row=1, column=2)
+    time_entry = tk.Entry(seminar_frame, width=25)
+    time_entry.grid(row=1, column=3)
+
+    tk.Label(seminar_frame, text="Venue").grid(row=2, column=0)
+    venue_entry = tk.Entry(seminar_frame, width=25)
+    venue_entry.grid(row=2, column=1)
+
+    tk.Label(seminar_frame, text="Available Seats").grid(row=2, column=2)
+    seats_entry = tk.Entry(seminar_frame, width=25)
+    seats_entry.grid(row=2, column=3)
+
+    tk.Button(
+        seminar_frame,
+        text="Add Seminar",
+        command=add_seminar,
+        width=20
+    ).grid(row=3, column=1, pady=10)
+
+    tk.Button(
+        seminar_frame,
+        text="View Seminars",
+        command=view_seminars,
+        width=20
+    ).grid(row=3, column=2, pady=10)
+
+    # Registration section
+    registration_frame = tk.LabelFrame(
+        dashboard_window,
+        text="Student Registration",
+        padx=10,
+        pady=10
+    )
+    registration_frame.pack(fill="x", padx=20, pady=10)
+
+    tk.Label(registration_frame, text="Student ID").grid(row=0, column=0)
+    student_id_entry = tk.Entry(registration_frame, width=25)
+    student_id_entry.grid(row=0, column=1)
+
+    tk.Label(registration_frame, text="Student Name").grid(row=0, column=2)
+    student_name_entry = tk.Entry(registration_frame, width=25)
+    student_name_entry.grid(row=0, column=3)
+
+    tk.Label(registration_frame, text="Department").grid(row=1, column=0)
+    department_entry = tk.Entry(registration_frame, width=25)
+    department_entry.grid(row=1, column=1)
+
+    tk.Label(registration_frame, text="Email").grid(row=1, column=2)
+    email_entry = tk.Entry(registration_frame, width=25)
+    email_entry.grid(row=1, column=3)
+
+    tk.Label(registration_frame, text="Phone").grid(row=2, column=0)
+    phone_entry = tk.Entry(registration_frame, width=25)
+    phone_entry.grid(row=2, column=1)
+
+    tk.Label(registration_frame, text="Seminar ID").grid(row=2, column=2)
+    seminar_id_entry = tk.Entry(registration_frame, width=25)
+    seminar_id_entry.grid(row=2, column=3)
+
+    tk.Button(
+        registration_frame,
+        text="Register Student",
+        command=register_student,
+        width=20
+    ).grid(row=3, column=1, pady=10)
+
+    tk.Button(
+        registration_frame,
+        text="View Registrations",
+        command=view_registrations,
+        width=20
+    ).grid(row=3, column=2, pady=10)
+
+    # Search section
+    search_frame = tk.LabelFrame(
+        dashboard_window,
+        text="Search Registration",
+        padx=10,
+        pady=10
+    )
+    search_frame.pack(fill="x", padx=20, pady=10)
+
+    tk.Label(search_frame, text="Student ID").pack(side="left")
+
+    search_entry = tk.Entry(search_frame, width=25)
+    search_entry.pack(side="left", padx=10)
+
+    tk.Button(
+        search_frame,
+        text="Search",
+        command=search_registration,
+        width=15
+    ).pack(side="left")
+
+    dashboard_window.mainloop()
+
+
+# Login window
+login_window = tk.Tk()
+login_window.title("Admin Login")
+login_window.geometry("400x300")
+
+tk.Label(
+    login_window,
+    text="Seminar Registration System",
+    font=("Arial", 18, "bold")
+).pack(pady=20)
+
+tk.Label(login_window, text="Username").pack()
+
+username_entry = tk.Entry(login_window)
+username_entry.pack(pady=5)
+
+tk.Label(login_window, text="Password").pack()
+
+password_entry = tk.Entry(login_window, show="*")
+password_entry.pack(pady=5)
+
+tk.Button(
+    login_window,
+    text="Login",
+    command=login,
+    width=20
+).pack(pady=20)
+
+login_window.mainloop()
