@@ -1,0 +1,45 @@
+
+    tk.Label(search_frame, text="Student ID").pack(side="left")
+
+    search_entry = tk.Entry(search_frame, width=25)
+    search_entry.pack(side="left", padx=10)
+
+    tk.Button(
+        search_frame,
+        text="Search",
+        command=search_registration,
+        width=15
+    ).pack(side="left")
+
+    dashboard_window.mainloop()
+
+
+# Login window
+login_window = tk.Tk()
+login_window.title("Admin Login")
+login_window.geometry("400x300")
+
+tk.Label(
+    login_window,
+    text="Seminar Registration System",
+    font=("Arial", 18, "bold")
+).pack(pady=20)
+
+tk.Label(login_window, text="Username").pack()
+
+username_entry = tk.Entry(login_window)
+username_entry.pack(pady=5)
+
+tk.Label(login_window, text="Password").pack()
+
+password_entry = tk.Entry(login_window, show="*")
+password_entry.pack(pady=5)
+
+tk.Button(
+    login_window,
+    text="Login",
+    command=login,
+    width=20
+).pack(pady=20)
+
+login_window.mainloop()
